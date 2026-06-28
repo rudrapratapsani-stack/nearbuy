@@ -1,268 +1,536 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
+// ─── Design Tokens ───────────────────────────────────────────────────────────
+const C = {
+  bg: '#0f0f0f',
+  surface: '#1a1a1a',
+  card: '#222222',
+  orange: '#FF6B2C',
+  orangeHover: '#e85a1e',
+  orangeLight: '#ff8c5a',
+  text: '#f0f0f0',
+  muted: '#888888',
+  border: '#2e2e2e',
+  white: '#ffffff',
+};
+
+const fonts = {
+  display: "'Syne', sans-serif",
+  body: "'DM Sans', sans-serif",
+};
+
+const googleFontsLink = `
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: ${C.bg}; color: ${C.text}; font-family: ${fonts.body}; }
+
+.nb-btn {
+background: ${C.orange};
+color: #fff;
+border: none;
+border-radius: 10px;
+padding: 14px 20px;
+font-size: 15px;
+font-weight: 600;
+cursor: pointer;
+width: 100%;
+transition: background 0.2s;
+font-family: ${fonts.body};
+}
+.nb-btn:hover { background: ${C.orangeHover}; }
+.nb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.nb-btn-ghost {
+background: transparent;
+color: ${C.muted};
+border: none;
+cursor: pointer;
+font-size: 14px;
+text-decoration: underline;
+font-family: ${fonts.body};
+padding: 4px 0;
+}
+
+.nb-input {
+background: ${C.card};
+border: 1px solid ${C.border};
+border-radius: 10px;
+padding: 13px 16px;
+color: ${C.text};
+font-size: 15px;
+width: 100%;
+outline: none;
+font-family: ${fonts.body};
+transition: border-color 0.2s;
+}
+.nb-input:focus { border-color: ${C.orange}; }
+.nb-input::placeholder { color: ${C.muted}; }
+
+.nb-card {
+background: ${C.card};
+border: 1px solid ${C.border};
+border-radius: 14px;
+padding: 18px 20px;
+transition: border-color 0.2s;
+}
+.nb-card:hover { border-color: ${C.orange}; }
+
+.badge {
+display: inline-block;
+background: ${C.orange}22;
+color: ${C.orangeLight};
+border-radius: 6px;
+padding: 3px 10px;
+font-size: 12px;
+font-weight: 600;
+letter-spacing: 0.04em;
+}
+`;
+
+// Inject styles once
+if (!document.getElementById('nb-styles')) {
+  const style = document.createElement('style');
+  style.id = 'nb-styles';
+  style.textContent = googleFontsLink;
+  document.head.appendChild(style);
+}
+
+// ─── Role Selection Screen ────────────────────────────────────────────────────
+function RoleScreen({ onSelect }) {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: C.bg,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: '24px',
+    }}>
+      {/* Logo */}
+      <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+        <div style={{
+          width: 64, height: 64,
+          background: C.orange,
+          borderRadius: 18,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 30, margin: '0 auto 16px',
+        }}>🛍️</div>
+        <h1 style={{ fontFamily: fonts.display, fontSize: 32, fontWeight: 800, color: C.white }}>
+          NearBuy
+        </h1>
+        <p style={{ color: C.muted, marginTop: 6, fontSize: 15 }}>
+          Apne sector ki dukaan, apni bhasha mein
+        </p>
+      </div>
+
+      {/* Role buttons */}
+      <div style={{ width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {[
+          { role: 'customer', label: '🛒 Customer', sub: 'Shops dhundho aur items khojo' },
+          { role: 'shopkeeper', label: '🏪 Shop Owner', sub: 'Apni dukaan manage karo' },
+          { role: 'admin', label: '⚙️ Admin', sub: 'Platform manage karo' },
+        ].map(({ role, label, sub }) => (
+          <button
+            key={role}
+            onClick={() => onSelect(role)}
+            style={{
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 14,
+              padding: '18px 20px',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'border-color 0.2s, background 0.2s',
+              color: C.text,
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = C.orange;
+              e.currentTarget.style.background = C.card;
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.background = C.surface;
+            }}
+          >
+            <div style={{ fontFamily: fonts.display, fontSize: 16, fontWeight: 700 }}>{label}</div>
+            <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{sub}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Auth Screen (Login / Signup) ─────────────────────────────────────────────
+function AuthScreen({ role, onBack }) {
+  const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [authMode, setAuthMode] = useState('login');
+  const [isError, setIsError] = useState(false);
 
-  // Shop Owner Form States
-  const [shopName, setShopName] = useState('');
-  const [shopLocation, setShopLocation] = useState('');
-  const [shopCategory, setShopCategory] = useState('');
-  const [myShop, setMyShop] = useState(null);
+  const roleLabels = { customer: '🛒 Customer', shopkeeper: '🏪 Shop Owner', admin: '⚙️ Admin' };
 
-  // Item Form States
-  const [itemName, setItemName] = useState('');
-  const [itemPrice, setItemPrice] = useState('');
-  const [myItems, setMyItems] = useState([]);
+  const handleAuth = async () => {
+    setLoading(true);
+    setMessage('');
+    setIsError(false);
+
+    let result;
+    if (mode === 'login') {
+      result = await supabase.auth.signInWithPassword({ email, password });
+    } else {
+      result = await supabase.auth.signUp({ email, password });
+    }
+
+    if (result.error) {
+      setMessage(result.error.message);
+      setIsError(true);
+    } else if (mode === 'signup') {
+      setMessage('Account ban gaya! Ab login karo.');
+      setMode('login');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: C.bg,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: '24px',
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 380,
+        background: C.surface,
+        border: `1px solid ${C.border}`,
+        borderRadius: 20,
+        padding: '32px 28px',
+      }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>🛍️</div>
+          <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 800, color: C.white }}>
+            NearBuy
+          </h2>
+          <span className="badge" style={{ marginTop: 8 }}>{roleLabels[role]}</span>
+        </div>
+
+        {/* Tab switcher */}
+        <div style={{
+          display: 'flex',
+          background: C.card,
+          borderRadius: 10,
+          padding: 4,
+          marginBottom: 24,
+          gap: 4,
+        }}>
+          {['login', 'signup'].map(m => (
+            <button
+              key={m}
+              onClick={() => { setMode(m); setMessage(''); }}
+              style={{
+                flex: 1,
+                padding: '9px',
+                borderRadius: 8,
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: fonts.body,
+                background: mode === m ? C.orange : 'transparent',
+                color: mode === m ? C.white : C.muted,
+                transition: 'all 0.2s',
+              }}
+            >
+              {m === 'login' ? 'Login' : 'Sign Up'}
+            </button>
+          ))}
+        </div>
+
+        {/* Message */}
+        {message && (
+          <div style={{
+            background: isError ? '#ff3b3b22' : '#22c55e22',
+            color: isError ? '#ff6b6b' : '#4ade80',
+            border: `1px solid ${isError ? '#ff3b3b44' : '#22c55e44'}`,
+            borderRadius: 8,
+            padding: '10px 14px',
+            fontSize: 13,
+            marginBottom: 16,
+          }}>
+            {message}
+          </div>
+        )}
+
+        {/* Form */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input
+            className="nb-input"
+            type="email"
+            placeholder="Email address"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+          />
+          <input
+            className="nb-input"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAuth()}
+          />
+          <button className="nb-btn" onClick={handleAuth} disabled={loading} style={{ marginTop: 4 }}>
+            {loading ? 'Please wait...' : mode === 'login' ? 'Login karo' : 'Account banao'}
+          </button>
+        </div>
+
+        {/* Back */}
+        <div style={{ textAlign: 'center', marginTop: 18 }}>
+          <button className="nb-btn-ghost" onClick={onBack}>
+            ← Wapas jao
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Customer Dashboard ───────────────────────────────────────────────────────
+function CustomerDashboard({ user, onLogout }) {
+  const [search, setSearch] = useState('');
+
+  const mockShops = [
+    { id: 1, name: 'Sharma General Store', location: 'Sector 18', category: 'Grocery', emoji: '🛒' },
+    { id: 2, name: 'Noida Medicos', location: 'Sector 18', category: 'Medical', emoji: '💊' },
+    { id: 3, name: 'Fresh Vegetables Wala', location: 'Sector 62', category: 'Vegetables', emoji: '🥦' },
+    { id: 4, name: 'Verma Electronics', location: 'Sector 50', category: 'Electronics', emoji: '📱' },
+    { id: 5, name: 'Kapoor Sweets', location: 'Sector 44', category: 'Food', emoji: '🍬' },
+  ];
+
+  const filtered = mockShops.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.category.toLowerCase().includes(search.toLowerCase()) ||
+    s.location.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
+      {/* Navbar */}
+      <div style={{
+        background: C.surface,
+        borderBottom: `1px solid ${C.border}`,
+        padding: '14px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        position: 'sticky', top: 0, zIndex: 10,
+      }}>
+        <div style={{ fontFamily: fonts.display, fontSize: 20, fontWeight: 800, color: C.white }}>
+          🛍️ NearBuy
+        </div>
+        <button
+          onClick={onLogout}
+          style={{
+            background: 'transparent',
+            border: `1px solid ${C.border}`,
+            color: C.muted,
+            borderRadius: 8,
+            padding: '7px 14px',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontFamily: fonts.body,
+          }}
+        >
+          Logout
+        </button>
+      </div>
+
+      <div style={{ padding: '20px', maxWidth: 500, margin: '0 auto' }}>
+        {/* Greeting */}
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 800, color: C.white }}>
+            Kya dhundh rahe ho? 🔍
+          </h2>
+          <p style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{user?.email}</p>
+        </div>
+
+        {/* Search */}
+        <div style={{ position: 'relative', marginBottom: 28 }}>
+          <input
+            className="nb-input"
+            type="text"
+            placeholder="Shop ya item type karo..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ paddingRight: 48 }}
+          />
+          <span style={{
+            position: 'absolute', right: 14, top: '50%',
+            transform: 'translateY(-50%)', fontSize: 18,
+          }}>🔍</span>
+        </div>
+
+        {/* Shop cards */}
+        <div style={{ marginBottom: 12 }}>
+          <span style={{ color: C.muted, fontSize: 13 }}>
+            {filtered.length} shops mile • Sector 18 ke aas paas
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {filtered.map(shop => (
+            <div key={shop.id} className="nb-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 48, height: 48,
+                  background: C.orange + '22',
+                  borderRadius: 12,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 22, flexShrink: 0,
+                }}>
+                  {shop.emoji}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
+                  <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
+                </div>
+                <span className="badge">{shop.category}</span>
+              </div>
+            </div>
+          ))}
+
+          {filtered.length === 0 && (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '40px 0', fontSize: 15 }}>
+              😔 Koi shop nahi mili<br />
+              <span style={{ fontSize: 13 }}>Dusra naam try karo</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{
+          textAlign: 'center',
+          color: C.orange,
+          fontWeight: 600,
+          marginTop: 30,
+          fontSize: 13,
+          padding: '16px',
+          background: C.orange + '11',
+          borderRadius: 10,
+          border: `1px solid ${C.orange}33`,
+        }}>
+          ⚡ Real-time search aur GPS — Coming Soon!
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Coming Soon Panel ────────────────────────────────────────────────────────
+function ComingSoonPanel({ role, user, onLogout }) {
+  const labels = { shopkeeper: '🏪 Shop Owner Panel', admin: '⚙️ Admin Panel' };
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
+      <div style={{
+        background: C.surface,
+        borderBottom: `1px solid ${C.border}`,
+        padding: '14px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <div style={{ fontFamily: fonts.display, fontSize: 20, fontWeight: 800, color: C.white }}>
+          🛍️ NearBuy
+        </div>
+        <button
+          onClick={onLogout}
+          style={{
+            background: 'transparent',
+            border: `1px solid ${C.border}`,
+            color: C.muted,
+            borderRadius: 8,
+            padding: '7px 14px',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontFamily: fonts.body,
+          }}
+        >
+          Logout
+        </button>
+      </div>
+
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        minHeight: 'calc(100vh - 57px)',
+        padding: 24, textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 56, marginBottom: 20 }}>🚀</div>
+        <h2 style={{ fontFamily: fonts.display, fontSize: 24, fontWeight: 800, color: C.white }}>
+          {labels[role]}
+        </h2>
+        <p style={{ color: C.muted, marginTop: 10, fontSize: 15, maxWidth: 280 }}>
+          Yeh panel abhi ban raha hai. Jald aayega!
+        </p>
+        <div style={{
+          marginTop: 24,
+          background: C.orange + '11',
+          border: `1px solid ${C.orange}33`,
+          borderRadius: 10,
+          padding: '12px 20px',
+          color: C.orange,
+          fontWeight: 600,
+          fontSize: 14,
+        }}>
+          ⚡ Coming Soon
+        </div>
+        <p style={{ color: C.muted, fontSize: 12, marginTop: 16 }}>{user?.email}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
+  const [authRole, setAuthRole] = useState(null); // role selected for login
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserShop(session.user.email);
-      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserShop(session.user.email);
-      } else {
-        setMyShop(null);
-        setMyItems([]);
-      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Shop Owner ki dukan fetch karne ke liye
-  const fetchUserShop = async (userEmail) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('shops')
-        .select('*')
-        .eq('owner_email', userEmail);
-
-      if (data && data.length > 0) {
-        setMyShop(data[0]);
-        fetchShopItems(data[0].id);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-    setLoading(false);
-  };
-
-  // Shop ke items fetch karne ke liye
-  const fetchShopItems = async (shopId) => {
-    const { data } = await supabase
-      .from('items')
-      .select('*')
-      .eq('shop_id', shopId);
-    if (data) setMyItems(data);
-  };
-
-  // Sign Up / Login Handle karne ke liye
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
-
-    if (authMode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) setMessage(error.message);
-      else setMessage('Signup successful! Check your email for confirmation.');
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setMessage(error.message);
-    }
-    setLoading(false);
-  };
-
-  // Nayi Dukan Register karne ke liye
-  const handleRegisterShop = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from('shops')
-      .insert([
-        { name: shopName, location: shopLocation, category: shopCategory, owner_email: user.email }
-      ])
-      .select();
-
-    if (error) {
-      alert('Error registering shop: ' + error.message);
-    } else {
-      alert('Shop Registered Successfully!');
-      if (data && data.length > 0) {
-        setMyShop(data[0]);
-      }
-    }
-    setLoading(false);
-  };
-
-  // Naya Item Add karne ke liye
-  const handleAddItem = async (e) => {
-    e.preventDefault();
-    if (!myShop) return;
-
-    const { error } = await supabase
-      .from('items')
-      .insert([
-        { name: itemName, price: parseFloat(itemPrice), shop_id: myShop.id }
-      ]);
-
-    if (error) {
-      alert('Error adding item: ' + error.message);
-    } else {
-      alert('Item Added!');
-      setItemName('');
-      setItemPrice('');
-      fetchShopItems(myShop.id);
-    }
-  };
-
-  const handleLogout = () => {
-    supabase.auth.signOut();
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setRole(null);
+    setAuthRole(null);
   };
 
+  // Not logged in: show role selection or auth screen
   if (!user) {
-    return (
-      <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px', border: '1px solid #ccc', borderRadius: '8px', fontFamily: 'Arial' }}>
-        <h2>NearBuy - {authMode === 'login' ? 'Login' : 'Sign Up'}</h2>
-        <form onSubmit={handleAuth}>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Email:</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} />
-          </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label>Password:</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} />
-          </div>
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            {loading ? 'Processing...' : authMode === 'login' ? 'Login' : 'Sign Up'}
-          </button>
-        </form>
-        {message && <p style={{ color: 'blue', marginTop: '10px' }}>{message}</p>}
-        <p style={{ marginTop: '15px', textAlign: 'center' }}>
-          {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
-          <span style={{ color: '#007bff', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>
-            {authMode === 'login' ? 'Sign Up' : 'Login'}
-          </span>
-        </p>
-      </div>
-    );
+    if (!authRole) return <RoleScreen onSelect={r => setAuthRole(r)} />;
+    return <AuthScreen role={authRole} onBack={() => setAuthRole(null)} />;
   }
 
-  if (!role) {
-    return (
-      <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'Arial' }}>
-        <h2>Welcome to NearBuy ({user.email})</h2>
-        <p>Aap is app ko kaise use karna chahte hain?</p>
-        <div style={{ marginTop: '20px' }}>
-          <button onClick={() => setRole('customer')} style={{ padding: '15px 30px', marginRight: '20px', fontSize: '16px', cursor: 'pointer', background: '#28a745', color: '#fff', border: 'none', borderRadius: '5px' }}>
-            I am a Customer
-          </button>
-          <button onClick={() => setRole('shop_owner')} style={{ padding: '15px 30px', fontSize: '16px', cursor: 'pointer', background: '#ffc107', color: '#000', border: 'none', borderRadius: '5px' }}>
-            I am a Shop Owner
-          </button>
-        </div>
-        <button onClick={handleLogout} style={{ marginTop: '40px', padding: '8px 15px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
-      </div>
-    );
-  }
+  // Logged in but role not picked yet
+  if (!role) return <RoleScreen onSelect={r => setRole(r)} />;
 
-  if (role === 'customer') {
-    return (
-      <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Customer Dashboard</h2>
-          <button onClick={handleLogout} style={{ padding: '8px 15px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
-        </div>
-        <p>Yahan aaspas ki dukanen aur items dikhenge (Search feature yahan banega).</p>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto', fontFamily: 'Arial' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
-        <h2>Shop Owner Panel</h2>
-        <button onClick={handleLogout} style={{ padding: '8px 15px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Logout</button>
-      </div>
-
-      {loading && <p>Loading shop details...</p>}
-
-      {!loading && !myShop && (
-        <div style={{ marginTop: '20px', padding: '20px', background: '#f8f9fa', borderRadius: '8px' }}>
-          <h3>Register Your Shop</h3>
-          <form onSubmit={handleRegisterShop}>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Shop Name:</label>
-              <input type="text" value={shopName} onChange={(e) => setShopName(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} />
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Location / Address:</label>
-              <input type="text" value={shopLocation} onChange={(e) => setShopLocation(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} />
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Category (e.g. Grocery, Cafe, Clothes):</label>
-              <input type="text" value={shopCategory} onChange={(e) => setShopCategory(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} />
-            </div>
-            <button type="submit" style={{ padding: '10px 20px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Register Shop</button>
-          </form>
-        </div>
-      )}
-
-      {!loading && myShop && (
-        <div style={{ marginTop: '20px' }}>
-          <div style={{ background: '#e2e3e5', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-            <h3>🏪 {myShop.name}</h3>
-            <p><strong>📍 Location:</strong> {myShop.location} | <strong>📦 Category:</strong> {myShop.category}</p>
-          </div>
-
-          <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px', marginBottom: '20px' }}>
-            <h4>Add New Product / Item</h4>
-            <form onSubmit={handleAddItem} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-              <div style={{ flex: 2 }}>
-                <label style={{ fontSize: '12px' }}>Item Name:</label>
-                <input type="text" value={itemName} onChange={(e) => setItemName(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} placeholder="e.g. Milk" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '12px' }}>Price (₹):</label>
-                <input type="number" value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} placeholder="e.g. 60" />
-              </div>
-              <button type="submit" style={{ padding: '8px 15px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', height: '36px' }}>Add</button>
-            </form>
-          </div>
-
-          <div>
-            <h4>Your Product List ({myItems.length})</h4>
-            {myItems.length === 0 ? (
-              <p style={{ color: 'gray' }}>Abhi tak koi item add nahi kiya hai.</p>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0 }}>
-                {myItems.map((item) => (
-                  <li key={item.id} style={{ padding: '10px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{item.name}</span>
-                    <strong>₹{item.price}</strong>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  // Logged in with role
+  if (role === 'customer') return <CustomerDashboard user={user} onLogout={handleLogout} />;
+  return <ComingSoonPanel role={role} user={user} onLogout={handleLogout} />;
 }
