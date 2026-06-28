@@ -306,20 +306,22 @@ function AuthScreen({ role, onBack }) {
 // ─── Customer Dashboard ───────────────────────────────────────────────────────
 function CustomerDashboard({ user, onLogout }) {
   const [search, setSearch] = useState('');
+  const [shops, setShops] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    fetchShops();
+  }, [search]);
 
-  const mockShops = [
-    { id: 1, name: 'Sharma General Store', location: 'Sector 18', category: 'Grocery', emoji: '🛒' },
-    { id: 2, name: 'Noida Medicos', location: 'Sector 18', category: 'Medical', emoji: '💊' },
-    { id: 3, name: 'Fresh Vegetables Wala', location: 'Sector 62', category: 'Vegetables', emoji: '🥦' },
-    { id: 4, name: 'Verma Electronics', location: 'Sector 50', category: 'Electronics', emoji: '📱' },
-    { id: 5, name: 'Kapoor Sweets', location: 'Sector 44', category: 'Food', emoji: '🍬' },
-  ];
-
-  const filtered = mockShops.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.category.toLowerCase().includes(search.toLowerCase()) ||
-    s.location.toLowerCase().includes(search.toLowerCase())
-  );
+  const fetchShops = async () => {
+    setLoading(true);
+    let query = supabase.from('shops').select('*');
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,category.ilike.%${search}%,location.ilike.%${search}%`);
+    }
+    const { data, error } = await query;
+    if (!error) setShops(data);
+    setLoading(false);
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
@@ -381,12 +383,12 @@ function CustomerDashboard({ user, onLogout }) {
         {/* Shop cards */}
         <div style={{ marginBottom: 12 }}>
           <span style={{ color: C.muted, fontSize: 13 }}>
-            {filtered.length} shops mile • Sector 18 ke aas paas
+            {shops.length} shops mile • Sector 18 ke aas paas
           </span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {filtered.map(shop => (
+          {shops.map(shop => (
             <div key={shop.id} className="nb-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{
@@ -407,7 +409,7 @@ function CustomerDashboard({ user, onLogout }) {
             </div>
           ))}
 
-          {filtered.length === 0 && (
+          {shops.length === 0 && (
             <div style={{ textAlign: 'center', color: C.muted, padding: '40px 0', fontSize: 15 }}>
               😔 Koi shop nahi mili<br />
               <span style={{ fontSize: 13 }}>Dusra naam try karo</span>
