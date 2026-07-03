@@ -434,6 +434,133 @@ function CustomerDashboard({ user, onLogout }) {
     </div>
   );
 }
+// ─── Admin Dashboard ────────────────────────────────────────────────────────
+function AdminDashboard({ user, onLogout }) {
+  const [allShops, setAllShops] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [tab, setTab] = useState('shops');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAllShops();
+  }, []);
+
+  const fetchAllShops = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('shops').select('*');
+    if (data) setAllShops(data);
+    setLoading(false);
+  };
+
+  const handleDeleteShop = async (id) => {
+    await supabase.from('shops').delete().eq('id', id);
+    fetchAllShops();
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
+      {/* Navbar */}
+      <div style={{
+        background: C.surface,
+        borderBottom: `1px solid ${C.border}`,
+        padding: '14px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        position: 'sticky', top: 0, zIndex: 10,
+      }}>
+        <div style={{ fontFamily: fonts.display, fontSize: 20, fontWeight: 800, color: C.white }}>
+          🛍️ NearBuy Admin
+        </div>
+        <button onClick={onLogout} style={{
+          background: 'transparent',
+          border: `1px solid ${C.border}`,
+          color: C.muted,
+          borderRadius: 8,
+          padding: '7px 14px',
+          cursor: 'pointer',
+          fontSize: 13,
+          fontFamily: fonts.body,
+        }}>Logout</button>
+      </div>
+
+      <div style={{ padding: '20px', maxWidth: 500, margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 800, color: C.white }}>
+            ⚙️ Admin Panel
+          </h2>
+          <p style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{user?.email}</p>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+          <div style={{
+            flex: 1, background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 12, padding: '16px',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontFamily: fonts.display, fontSize: 28, fontWeight: 800, color: C.orange }}>
+              {allShops.length}
+            </div>
+            <div style={{ color: C.muted, fontSize: 13 }}>Total Shops</div>
+          </div>
+          <div style={{
+            flex: 1, background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 12, padding: '16px',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontFamily: fonts.display, fontSize: 28, fontWeight: 800, color: C.orange }}>
+              {[...new Set(allShops.map(s => s.owner_email))].length}
+            </div>
+            <div style={{ color: C.muted, fontSize: 13 }}>Shop Owners</div>
+          </div>
+        </div>
+
+        {/* All Shops */}
+        <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 700, color: C.white, marginBottom: 14 }}>
+          Saari Shops ({allShops.length})
+        </h3>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', color: C.muted, padding: '30px 0' }}>Loading...</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {allShops.map(shop => (
+              <div key={shop.id} className="nb-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
+                    <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
+                    <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>👤 {shop.owner_email}</div>
+                    <span className="badge" style={{ marginTop: 6 }}>{shop.category}</span>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteShop(shop.id)}
+                    style={{
+                      background: '#ff3b3b22',
+                      color: '#ff6b6b',
+                      border: '1px solid #ff3b3b44',
+                      borderRadius: 8,
+                      padding: '6px 12px',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontFamily: fonts.body,
+                      flexShrink: 0,
+                    }}>
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 // ─── Shop Owner Dashboard ────────────────────────────────────────────────────
 function ShopOwnerDashboard({ user, onLogout }) {
   const [shopName, setShopName] = useState('');
@@ -633,5 +760,6 @@ export default function App() {
   // Logged in with role
   if (role === 'customer') return <CustomerDashboard user={user} onLogout={handleLogout} />;
   if (role === 'shopkeeper') return <ShopOwnerDashboard user={user} onLogout={handleLogout} />;
+  if (role === 'admin') return <AdminDashboard user={user} onLogout={handleLogout} />;
   return null;
 }
