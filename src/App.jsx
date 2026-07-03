@@ -434,12 +434,63 @@ function CustomerDashboard({ user, onLogout }) {
     </div>
   );
 }
+// ─── Shop Owner Dashboard ────────────────────────────────────────────────────
+function ShopOwnerDashboard({ user, onLogout }) {
+  const [shopName, setShopName] = useState('');
+  const [location, setLocation] = useState('');
+  const [category, setCategory] = useState('');
+  const [myShops, setMyShops] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
 
-// ─── Coming Soon Panel ────────────────────────────────────────────────────────
-function ComingSoonPanel({ role, user, onLogout }) {
-  const labels = { shopkeeper: '🏪 Shop Owner Panel', admin: '⚙️ Admin Panel' };
+  useEffect(() => {
+    fetchMyShops();
+  }, []);
+
+  const fetchMyShops = async () => {
+    const { data } = await supabase
+      .from('shops')
+      .select('*')
+      .eq('owner_email', user.email);
+    if (data) setMyShops(data);
+  };
+
+  const handleAddShop = async () => {
+    if (!shopName || !location || !category) {
+      setMessage('Saari fields bharo!');
+      setIsError(true);
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.from('shops').insert([{
+      name: shopName,
+      location: location,
+      category: category,
+      owner_email: user.email,
+    }]);
+    if (error) {
+      setMessage(error.message);
+      setIsError(true);
+    } else {
+      setMessage('Shop add ho gayi! 🎉');
+      setIsError(false);
+      setShopName('');
+      setLocation('');
+      setCategory('');
+      fetchMyShops();
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteShop = async (id) => {
+    await supabase.from('shops').delete().eq('id', id);
+    fetchMyShops();
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
+      {/* Navbar */}
       <div style={{
         background: C.surface,
         borderBottom: `1px solid ${C.border}`,
@@ -447,53 +498,100 @@ function ComingSoonPanel({ role, user, onLogout }) {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        position: 'sticky', top: 0, zIndex: 10,
       }}>
         <div style={{ fontFamily: fonts.display, fontSize: 20, fontWeight: 800, color: C.white }}>
           🛍️ NearBuy
         </div>
-        <button
-          onClick={onLogout}
-          style={{
-            background: 'transparent',
-            border: `1px solid ${C.border}`,
-            color: C.muted,
-            borderRadius: 8,
-            padding: '7px 14px',
-            cursor: 'pointer',
-            fontSize: 13,
-            fontFamily: fonts.body,
-          }}
-        >
-          Logout
-        </button>
+        <button onClick={onLogout} style={{
+          background: 'transparent',
+          border: `1px solid ${C.border}`,
+          color: C.muted,
+          borderRadius: 8,
+          padding: '7px 14px',
+          cursor: 'pointer',
+          fontSize: 13,
+          fontFamily: fonts.body,
+        }}>Logout</button>
       </div>
 
-      <div style={{
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        minHeight: 'calc(100vh - 57px)',
-        padding: 24, textAlign: 'center',
-      }}>
-        <div style={{ fontSize: 56, marginBottom: 20 }}>🚀</div>
-        <h2 style={{ fontFamily: fonts.display, fontSize: 24, fontWeight: 800, color: C.white }}>
-          {labels[role]}
-        </h2>
-        <p style={{ color: C.muted, marginTop: 10, fontSize: 15, maxWidth: 280 }}>
-          Yeh panel abhi ban raha hai. Jald aayega!
-        </p>
-        <div style={{
-          marginTop: 24,
-          background: C.orange + '11',
-          border: `1px solid ${C.orange}33`,
-          borderRadius: 10,
-          padding: '12px 20px',
-          color: C.orange,
-          fontWeight: 600,
-          fontSize: 14,
-        }}>
-          ⚡ Coming Soon
+      <div style={{ padding: '20px', maxWidth: 500, margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 800, color: C.white }}>
+            🏪 Apni Shop Add Karo
+          </h2>
+          <p style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{user?.email}</p>
         </div>
-        <p style={{ color: C.muted, fontSize: 12, marginTop: 16 }}>{user?.email}</p>
+
+        {/* Message */}
+        {message && (
+          <div style={{
+            background: isError ? '#ff3b3b22' : '#22c55e22',
+            color: isError ? '#ff6b6b' : '#4ade80',
+            border: `1px solid ${isError ? '#ff3b3b44' : '#22c55e44'}`,
+            borderRadius: 8,
+            padding: '10px 14px',
+            fontSize: 13,
+            marginBottom: 16,
+          }}>{message}</div>
+        )}
+
+        {/* Form */}
+        <div style={{
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 14,
+          padding: '20px',
+          marginBottom: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}>
+          <input className="nb-input" placeholder="Shop ka naam" value={shopName} onChange={e => setShopName(e.target.value)} />
+          <input className="nb-input" placeholder="Location (jaise Sector 18, Noida)" value={location} onChange={e => setLocation(e.target.value)} />
+          <input className="nb-input" placeholder="Category (jaise Grocery, Medical)" value={category} onChange={e => setCategory(e.target.value)} />
+          <button className="nb-btn" onClick={handleAddShop} disabled={loading}>
+            {loading ? 'Adding...' : '+ Shop Add Karo'}
+          </button>
+        </div>
+
+        {/* My Shops */}
+        <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 700, color: C.white, marginBottom: 14 }}>
+          Meri Shops ({myShops.length})
+        </h3>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {myShops.length === 0 ? (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '30px 0' }}>
+              Abhi koi shop nahi hai — upar se add karo! 🏪
+            </div>
+          ) : (
+            myShops.map(shop => (
+              <div key={shop.id} className="nb-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
+                  <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
+                  <span className="badge" style={{ marginTop: 6 }}>{shop.category}</span>
+                </div>
+                <button
+                  onClick={() => handleDeleteShop(shop.id)}
+                  style={{
+                    background: '#ff3b3b22',
+                    color: '#ff6b6b',
+                    border: '1px solid #ff3b3b44',
+                    borderRadius: 8,
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontFamily: fonts.body,
+                  }}>
+                  🗑️ Delete
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
@@ -534,5 +632,6 @@ export default function App() {
 
   // Logged in with role
   if (role === 'customer') return <CustomerDashboard user={user} onLogout={handleLogout} />;
-  return <ComingSoonPanel role={role} user={user} onLogout={handleLogout} />;
+  if (role === 'shopkeeper') return <ShopOwnerDashboard user={user} onLogout={handleLogout} />;
+  return null;
 }
