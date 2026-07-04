@@ -760,6 +760,18 @@ export default function App() {
   // Logged in with role
   if (role === 'customer') return <CustomerDashboard user={user} onLogout={handleLogout} />;
   if (role === 'shopkeeper') return <ShopOwnerDashboard user={user} onLogout={handleLogout} />;
-  if (role === 'admin') return <AdminDashboard user={user} onLogout={handleLogout} />;
+  if (role === 'admin') {
+    if (user.email !== 'rudrapratap.sani@gmail.com') {
+      return (
+        <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: fonts.body }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+          <h2 style={{ color: C.white, fontFamily: fonts.display }}>Access Denied</h2>
+          <p style={{ color: C.muted, marginTop: 8 }}>Tumhare paas admin rights nahi hain.</p>
+          <button className="nb-btn" onClick={handleLogout} style={{ marginTop: 24, maxWidth: 200 }}>Logout</button>
+        </div>
+      );
+    }
+    return <AdminDashboard user={user} onLogout={handleLogout} />;
+  }
   return null;
 }
