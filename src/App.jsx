@@ -571,6 +571,13 @@ function ShopOwnerDashboard({ user, onLogout }) {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
+  // Items feature state
+  const [selectedShopId, setSelectedShopId] = useState(null);
+  const [allItems, setAllItems] = useState([]);
+  const [myShopItems, setMyShopItems] = useState([]);
+  const [itemPrices, setItemPrices] = useState({});
+  const [itemsLoading, setItemsLoading] = useState(false);
+
   useEffect(() => {
     fetchMyShops();
   }, []);
@@ -612,8 +619,108 @@ function ShopOwnerDashboard({ user, onLogout }) {
 
   const handleDeleteShop = async (id) => {
     await supabase.from('shops').delete().eq('id', id);
+    if (selectedShopId === id) setSelectedShopId(null);
     fetchMyShops();
   };
+
+  const openItemsFor = async (shopId) => {
+    setSelectedShopId(shopId);
+    setItemsLoading(true);
+
+    const { data: itemsData } = await supabase
+      .from('Items')
+      .select('*')
+      .eq('status', 'approved');
+
+    const { data: shopItemsData } = await supabase
+      .from('shop_items')
+      .select('*')
+      .eq('shop_id', shopId);
+
+    if (itemsData) setAllItems(itemsData);
+
+    const priceMap = {};
+    if (shopItemsData) {
+      shopItemsData.forEach(si => {
+        priceMap[si.item_id] = si.price?.toString() ?? '';
+      });
+      setMyShopItems(shopItemsData);
+    }
+    setItemPrices(priceMap);
+    setItemsLoading(false);
+  };
+
+  const closeItemsPanel = () => {
+    setSelectedShopId(null);
+    setAllItems([]);
+    setMyShopItems([]);
+    setItemPrices({});
+  };
+
+  const isItemAdded = (itemId) => myShopItems.some(si => si.item_id === itemId);
+
+  const handlePriceChange = (itemId, value) => {
+    setItemPrices(prev => ({ ...prev, [itemId]: value }));
+  };
+
+  const handleAddItem = async (item) => {
+    const priceVal = itemPrices[item.id];
+    if (!priceVal || isNaN(priceVal) || Number(priceVal) <= 0) {
+      setMessage('Sahi price daalo ' + item.Name + ' ke liye');
+      setIsError(true);
+      return;
+    }
+    const { error } = await supabase.from('shop_items').insert([{
+      shop_id: selectedShopId,
+      item_id: item.id,
+      price: Number(priceVal),
+    }]);
+    if (error) {
+      setMessage(error.message);
+      setIsError(true);
+    } else {
+      setMessage(item.Name + ' add ho gaya! 🎉');
+      setIsError(false);
+      openItemsFor(selectedShopId);
+    }
+  };
+
+  const handleUpdateItemPrice = async (item) => {
+    const priceVal = itemPrices[item.id];
+    if (!priceVal || isNaN(priceVal) || Number(priceVal) <= 0) {
+      setMessage('Sahi price daalo ' + item.Name + ' ke liye');
+      setIsError(true);
+      return;
+    }
+    const existing = myShopItems.find(si => si.item_id === item.id);
+    if (!existing) return;
+    const { error } = await supabase
+      .from('shop_items')
+      .update({ price: Number(priceVal) })
+      .eq('id', existing.id);
+    if (error) {
+      setMessage(error.message);
+      setIsError(true);
+    } else {
+      setMessage('Price update ho gaya! ✅');
+      setIsError(false);
+      openItemsFor(selectedShopId);
+    }
+  };
+
+  const handleRemoveItem = async (item) => {
+    const existing = myShopItems.find(si => si.item_id === item.id);
+    if (!existing) return;
+    await supabase.from('shop_items').delete().eq('id', existing.id);
+    openItemsFor(selectedShopId);
+  };
+
+  const groupedItems = allItems.reduce((acc, item) => {
+    const cat = item.category || 'Other';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
+    return acc;
+  }, {});
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
@@ -688,33 +795,143 @@ function ShopOwnerDashboard({ user, onLogout }) {
           Meri Shops ({myShops.length})
         </h3>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
           {myShops.length === 0 ? (
             <div style={{ textAlign: 'center', color: C.muted, padding: '30px 0' }}>
               Abhi koi shop nahi hai — upar se add karo! 🏪
             </div>
           ) : (
             myShops.map(shop => (
-              <div key={shop.id} className="nb-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
-                  <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
-                  <span className="badge" style={{ marginTop: 6 }}>{shop.category}</span>
+              <div key={shop.id} className="nb-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
+                    <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
+                    <span className="badge" style={{ marginTop: 6 }}>{shop.category}</span>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteShop(shop.id)}
+                    style={{
+                      background: '#ff3b3b22',
+                      color: '#ff6b6b',
+                      border: '1px solid #ff3b3b44',
+                      borderRadius: 8,
+                      padding: '6px 12px',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontFamily: fonts.body,
+                    }}>
+                    🗑️ Delete
+                  </button>
                 </div>
                 <button
-                  onClick={() => handleDeleteShop(shop.id)}
-                  style={{
-                    background: '#ff3b3b22',
-                    color: '#ff6b6b',
-                    border: '1px solid #ff3b3b44',
-                    borderRadius: 8,
-                    padding: '6px 12px',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    fontFamily: fonts.body,
-                  }}>
-                  🗑️ Delete
+                  className="nb-btn"
+                  onClick={() => selectedShopId === shop.id ? closeItemsPanel() : openItemsFor(shop.id)}
+                  style={{ marginTop: 14, background: selectedShopId === shop.id ? C.card : C.orange, border: selectedShopId === shop.id ? `1px solid ${C.border}` : 'none', color: selectedShopId === shop.id ? C.text : '#fff' }}
+                >
+                  {selectedShopId === shop.id ? '✕ Band Karo' : '📦 Items Manage Karo'}
                 </button>
+
+                {selectedShopId === shop.id && (
+                  <div style={{ marginTop: 18, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+                    {itemsLoading ? (
+                      <div style={{ textAlign: 'center', color: C.muted, padding: '20px 0' }}>Loading items...</div>
+                    ) : Object.keys(groupedItems).length === 0 ? (
+                      <div style={{ textAlign: 'center', color: C.muted, padding: '20px 0' }}>
+                        Abhi koi items available nahi hain
+                      </div>
+                    ) : (
+                      Object.keys(groupedItems).map(cat => (
+                        <div key={cat} style={{ marginBottom: 20 }}>
+                          <div style={{
+                            fontFamily: fonts.display,
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: C.orangeLight,
+                            marginBottom: 10,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                          }}>
+                            {cat}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {groupedItems[cat].map(item => {
+                              const added = isItemAdded(item.id);
+                              return (
+                                <div key={item.id} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  background: C.card,
+                                  borderRadius: 10,
+                                  padding: '10px 12px',
+                                  border: `1px solid ${added ? C.orange + '55' : C.border}`,
+                                }}>
+                                  <div style={{ flex: 1, fontSize: 14, color: C.text }}>
+                                    {item.Name}
+                                    {added && <span style={{ color: '#4ade80', fontSize: 11, marginLeft: 6 }}>✅ Added</span>}
+                                  </div>
+                                  <input
+                                    type="number"
+                                    placeholder="₹ Price"
+                                    value={itemPrices[item.id] ?? ''}
+                                    onChange={e => handlePriceChange(item.id, e.target.value)}
+                                    style={{
+                                      width: 80,
+                                      background: C.surface,
+                                      border: `1px solid ${C.border}`,
+                                      borderRadius: 8,
+                                      padding: '7px 10px',
+                                      color: C.text,
+                                      fontSize: 13,
+                                      outline: 'none',
+                                    }}
+                                  />
+                                  {added ? (
+                                    <>
+                                      <button
+                                        onClick={() => handleUpdateItemPrice(item)}
+                                        style={{
+                                          background: C.orange, color: '#fff', border: 'none',
+                                          borderRadius: 8, padding: '7px 10px', fontSize: 12,
+                                          cursor: 'pointer', fontFamily: fonts.body,
+                                        }}
+                                      >
+                                        Update
+                                      </button>
+                                      <button
+                                        onClick={() => handleRemoveItem(item)}
+                                        style={{
+                                          background: '#ff3b3b22', color: '#ff6b6b',
+                                          border: '1px solid #ff3b3b44', borderRadius: 8,
+                                          padding: '7px 10px', fontSize: 12, cursor: 'pointer',
+                                          fontFamily: fonts.body,
+                                        }}
+                                      >
+                                        🗑️
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleAddItem(item)}
+                                      style={{
+                                        background: C.orange, color: '#fff', border: 'none',
+                                        borderRadius: 8, padding: '7px 12px', fontSize: 12,
+                                        cursor: 'pointer', fontFamily: fonts.body,
+                                      }}
+                                    >
+                                      + Add
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -728,7 +945,7 @@ function ShopOwnerDashboard({ user, onLogout }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
-  const [authRole, setAuthRole] = useState(null); // role selected for login
+  const [authRole, setAuthRole] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -748,16 +965,13 @@ export default function App() {
     setAuthRole(null);
   };
 
-  // Not logged in: show role selection or auth screen
   if (!user) {
     if (!authRole) return <RoleScreen onSelect={r => setAuthRole(r)} />;
     return <AuthScreen role={authRole} onBack={() => setAuthRole(null)} />;
   }
 
-  // Logged in but role not picked yet
   if (!role) return <RoleScreen onSelect={r => setRole(r)} />;
 
-  // Logged in with role
   if (role === 'customer') return <CustomerDashboard user={user} onLogout={handleLogout} />;
   if (role === 'shopkeeper') return <ShopOwnerDashboard user={user} onLogout={handleLogout} />;
   if (role === 'admin') {
