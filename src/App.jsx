@@ -571,7 +571,6 @@ function ShopOwnerDashboard({ user, onLogout }) {
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
 
-  // Items feature state
   const [selectedShopId, setSelectedShopId] = useState(null);
   const [allItems, setAllItems] = useState([]);
   const [myShopItems, setMyShopItems] = useState([]);
@@ -721,7 +720,6 @@ function ShopOwnerDashboard({ user, onLogout }) {
     acc[cat].push(item);
     return acc;
   }, {});
-
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
       {/* Navbar */}
@@ -836,7 +834,98 @@ function ShopOwnerDashboard({ user, onLogout }) {
                   <div style={{ marginTop: 18, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
                     {itemsLoading ? (
                       <div style={{ textAlign: 'center', color: C.muted, padding: '20px 0' }}>Loading items...</div>
-                    ) : Object.keys(groupedItems).length === 0 ? (
+                    ) : (
+                      <>
+                        <div style={{ marginBottom: 22 }}>
+                          <div style={{
+                            fontFamily: fonts.display,
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: C.white,
+                            marginBottom: 10,
+                          }}>
+                            🧾 Meri Items ({myShopItems.length})
+                          </div>
+                          {myShopItems.length === 0 ? (
+                            <div style={{ color: C.muted, fontSize: 13, padding: '10px 0' }}>
+                              Abhi koi item add nahi kiya — niche list se add karo 👇
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {myShopItems.map(si => {
+                                const itemInfo = allItems.find(i => i.id === si.item_id);
+                                if (!itemInfo) return null;
+                                return (
+                                  <div key={si.id} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    background: C.orange + '11',
+                                    borderRadius: 10,
+                                    padding: '10px 12px',
+                                    border: `1px solid ${C.orange}44`,
+                                  }}>
+                                    <div style={{ flex: 1, fontSize: 14, color: C.white, fontWeight: 600 }}>
+                                      {itemInfo.Name}
+                                      <span className="badge" style={{ marginLeft: 8 }}>{itemInfo.category}</span>
+                                    </div>
+                                    <input
+                                      type="number"
+                                      value={itemPrices[si.item_id] ?? ''}
+                                      onChange={e => handlePriceChange(si.item_id, e.target.value)}
+                                      style={{
+                                        width: 80,
+                                        background: C.surface,
+                                        border: `1px solid ${C.border}`,
+                                        borderRadius: 8,
+                                        padding: '7px 10px',
+                                        color: C.text,
+                                        fontSize: 13,
+                                        outline: 'none',
+                                      }}
+                                    />
+                                    <button
+                                      onClick={() => handleUpdateItemPrice(itemInfo)}
+                                      style={{
+                                        background: C.orange, color: '#fff', border: 'none',
+                                        borderRadius: 8, padding: '7px 10px', fontSize: 12,
+                                        cursor: 'pointer', fontFamily: fonts.body,
+                                      }}
+                                    >
+                                      Update
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveItem(itemInfo)}
+                                      style={{
+                                        background: '#ff3b3b22', color: '#ff6b6b',
+                                        border: '1px solid #ff3b3b44', borderRadius: 8,
+                                        padding: '7px 10px', fontSize: 12, cursor: 'pointer',
+                                        fontFamily: fonts.body,
+                                      }}
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{
+                          fontFamily: fonts.display,
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: C.white,
+                          marginBottom: 10,
+                          borderTop: `1px solid ${C.border}`,
+                          paddingTop: 16,
+                        }}>
+                          + Naya Item Add Karo
+                        </div>
+                      </>
+                    )}
+                    {!itemsLoading && Object.keys(groupedItems).length === 0 ? (
                       <div style={{ textAlign: 'center', color: C.muted, padding: '20px 0' }}>
                         Abhi koi items available nahi hain
                       </div>
@@ -855,8 +944,7 @@ function ShopOwnerDashboard({ user, onLogout }) {
                             {cat}
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {groupedItems[cat].map(item => {
-                              const added = isItemAdded(item.id);
+                            {groupedItems[cat].filter(item => !isItemAdded(item.id)).map(item => {
                               return (
                                 <div key={item.id} style={{
                                   display: 'flex',
@@ -865,11 +953,10 @@ function ShopOwnerDashboard({ user, onLogout }) {
                                   background: C.card,
                                   borderRadius: 10,
                                   padding: '10px 12px',
-                                  border: `1px solid ${added ? C.orange + '55' : C.border}`,
+                                  border: `1px solid ${C.border}`,
                                 }}>
                                   <div style={{ flex: 1, fontSize: 14, color: C.text }}>
                                     {item.Name}
-                                    {added && <span style={{ color: '#4ade80', fontSize: 11, marginLeft: 6 }}>✅ Added</span>}
                                   </div>
                                   <input
                                     type="number"
@@ -887,42 +974,16 @@ function ShopOwnerDashboard({ user, onLogout }) {
                                       outline: 'none',
                                     }}
                                   />
-                                  {added ? (
-                                    <>
-                                      <button
-                                        onClick={() => handleUpdateItemPrice(item)}
-                                        style={{
-                                          background: C.orange, color: '#fff', border: 'none',
-                                          borderRadius: 8, padding: '7px 10px', fontSize: 12,
-                                          cursor: 'pointer', fontFamily: fonts.body,
-                                        }}
-                                      >
-                                        Update
-                                      </button>
-                                      <button
-                                        onClick={() => handleRemoveItem(item)}
-                                        style={{
-                                          background: '#ff3b3b22', color: '#ff6b6b',
-                                          border: '1px solid #ff3b3b44', borderRadius: 8,
-                                          padding: '7px 10px', fontSize: 12, cursor: 'pointer',
-                                          fontFamily: fonts.body,
-                                        }}
-                                      >
-                                        🗑️
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleAddItem(item)}
-                                      style={{
-                                        background: C.orange, color: '#fff', border: 'none',
-                                        borderRadius: 8, padding: '7px 12px', fontSize: 12,
-                                        cursor: 'pointer', fontFamily: fonts.body,
-                                      }}
-                                    >
-                                      + Add
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={() => handleAddItem(item)}
+                                    style={{
+                                      background: C.orange, color: '#fff', border: 'none',
+                                      borderRadius: 8, padding: '7px 12px', fontSize: 12,
+                                      cursor: 'pointer', fontFamily: fonts.body,
+                                    }}
+                                  >
+                                    + Add
+                                  </button>
                                 </div>
                               );
                             })}
