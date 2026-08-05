@@ -302,11 +302,11 @@ function AuthScreen({ role, onBack }) {
     </div>
   );
 }
-
 // ─── Customer Dashboard ───────────────────────────────────────────────────────
 function CustomerDashboard({ user, onLogout }) {
   const [search, setSearch] = useState('');
   const [shops, setShops] = useState([]);
+  const [matchedItemsByShop, setMatchedItemsByShop] = useState({});
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     fetchShops();
@@ -314,15 +314,65 @@ function CustomerDashboard({ user, onLogout }) {
 
   const fetchShops = async () => {
     setLoading(true);
-    let query = supabase.from('shops').select('*');
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,category.ilike.%${search}%,location.ilike.%${search}%`);
+
+    if (!search) {
+      const { data, error } = await supabase.from('shops').select('*');
+      if (!error) setShops(data);
+      setMatchedItemsByShop({});
+      setLoading(false);
+      return;
     }
-    const { data, error } = await query;
-    if (!error) setShops(data);
+
+    const { data: directShops } = await supabase
+      .from('shops')
+      .select('*')
+      .or(`name.ilike.%${search}%,category.ilike.%${search}%,location.ilike.%${search}%`);
+
+    const { data: matchingItems } = await supabase
+      .from('Items')
+      .select('*')
+      .ilike('Name', `%${search}%`);
+
+    let itemShopMap = {};
+    let itemMatchedShops = [];
+
+    if (matchingItems && matchingItems.length > 0) {
+      const itemIds = matchingItems.map(i => i.id);
+      const { data: shopItemsRows } = await supabase
+        .from('shop_items')
+        .select('*')
+        .in('item_id', itemIds);
+
+      if (shopItemsRows && shopItemsRows.length > 0) {
+        const shopIds = [...new Set(shopItemsRows.map(si => si.shop_id))];
+        const { data: shopsForItems } = await supabase
+          .from('shops')
+          .select('*')
+          .in('id', shopIds);
+
+        if (shopsForItems) itemMatchedShops = shopsForItems;
+
+        shopItemsRows.forEach(si => {
+          const itemInfo = matchingItems.find(i => i.id === si.item_id);
+          if (!itemInfo) return;
+          if (!itemShopMap[si.shop_id]) itemShopMap[si.shop_id] = [];
+          itemShopMap[si.shop_id].push({ name: itemInfo.Name, price: si.price });
+        });
+      }
+    }
+
+    const allMatched = [...(directShops || []), ...itemMatchedShops];
+    const uniqueShops = Object.values(
+      allMatched.reduce((acc, s) => {
+        acc[s.id] = s;
+        return acc;
+      }, {})
+    );
+
+    setShops(uniqueShops);
+    setMatchedItemsByShop(itemShopMap);
     setLoading(false);
   };
-
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
       {/* Navbar */}
@@ -388,26 +438,53 @@ function CustomerDashboard({ user, onLogout }) {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {shops.map(shop => (
-            <div key={shop.id} className="nb-card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{
-                  width: 48, height: 48,
-                  background: C.orange + '22',
-                  borderRadius: 12,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 22, flexShrink: 0,
-                }}>
-                  {shop.emoji}
+          {shops.map(shop => {
+            const matchedItems = matchedItemsByShop[shop.id] || [];
+            return (
+              <div key={shop.id} className="nb-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{
+                    width: 48, height: 48,
+                    background: C.orange + '22',
+                    borderRadius: 12,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 22, flexShrink: 0,
+                  }}>
+                    {shop.emoji}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
+                    <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
+                  </div>
+                  <span className="badge">{shop.category}</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
-                  <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
-                </div>
-                <span className="badge">{shop.category}</span>
+
+                {matchedItems.length > 0 && (
+                  <div style={{
+                    marginTop: 12,
+                    paddingTop: 12,
+                    borderTop: `1px solid ${C.border}`,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                  }}>
+                    {matchedItems.map((it, idx) => (
+                      <span key={idx} style={{
+                        background: C.orange + '15',
+                        color: C.orangeLight,
+                        borderRadius: 8,
+                        padding: '5px 10px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}>
+                        {it.name} • ₹{it.price}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {shops.length === 0 && (
             <div style={{ textAlign: 'center', color: C.muted, padding: '40px 0', fontSize: 15 }}>
@@ -428,12 +505,13 @@ function CustomerDashboard({ user, onLogout }) {
           borderRadius: 10,
           border: `1px solid ${C.orange}33`,
         }}>
-          ⚡ Real-time search aur GPS — Coming Soon!
+          ⚡ GPS aur directions — Coming Soon!
         </div>
       </div>
     </div>
   );
 }
+
 // ─── Admin Dashboard ────────────────────────────────────────────────────────
 function AdminDashboard({ user, onLogout }) {
   const [allShops, setAllShops] = useState([]);
