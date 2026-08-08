@@ -511,7 +511,6 @@ function CustomerDashboard({ user, onLogout }) {
     </div>
   );
 }
-
 // ─── Admin Dashboard ────────────────────────────────────────────────────────
 function AdminDashboard({ user, onLogout }) {
   const [allShops, setAllShops] = useState([]);
