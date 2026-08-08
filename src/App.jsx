@@ -637,493 +637,590 @@ function AdminDashboard({ user, onLogout }) {
       </div>
     </div>
   );
-}
-// ─── Shop Owner Dashboard ────────────────────────────────────────────────────
-function ShopOwnerDashboard({ user, onLogout }) {
-  const [shopName, setShopName] = useState('');
-  const [location, setLocation] = useState('');
-  const [category, setCategory] = useState('');
-  const [myShops, setMyShops] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [isError, setIsError] = useState(false);
+  // ─── Shop Owner Dashboard ────────────────────────────────────────────────────
+  function ShopOwnerDashboard({ user, onLogout }) {
+    const [shopName, setShopName] = useState('');
+    const [location, setLocation] = useState('');
+    const [category, setCategory] = useState('');
+    const [myShops, setMyShops] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
+    const [isError, setIsError] = useState(false);
 
-  const [selectedShopId, setSelectedShopId] = useState(null);
-  const [allItems, setAllItems] = useState([]);
-  const [myShopItems, setMyShopItems] = useState([]);
-  const [itemPrices, setItemPrices] = useState({});
-  const [itemsLoading, setItemsLoading] = useState(false);
+    const [selectedShopId, setSelectedShopId] = useState(null);
+    const [allItems, setAllItems] = useState([]);
+    const [myShopItems, setMyShopItems] = useState([]);
+    const [itemPrices, setItemPrices] = useState({});
+    const [itemsLoading, setItemsLoading] = useState(false);
 
-  useEffect(() => {
-    fetchMyShops();
-  }, []);
+    const [showSuggestForm, setShowSuggestForm] = useState(false);
+    const [suggestName, setSuggestName] = useState('');
+    const [suggestCategory, setSuggestCategory] = useState('');
+    const [suggestLoading, setSuggestLoading] = useState(false);
 
-  const fetchMyShops = async () => {
-    const { data } = await supabase
-      .from('shops')
-      .select('*')
-      .eq('owner_email', user.email);
-    if (data) setMyShops(data);
-  };
-
-  const handleAddShop = async () => {
-    if (!shopName || !location || !category) {
-      setMessage('Saari fields bharo!');
-      setIsError(true);
-      return;
-    }
-    setLoading(true);
-    const { error } = await supabase.from('shops').insert([{
-      name: shopName,
-      location: location,
-      category: category,
-      owner_email: user.email,
-    }]);
-    if (error) {
-      setMessage(error.message);
-      setIsError(true);
-    } else {
-      setMessage('Shop add ho gayi! 🎉');
-      setIsError(false);
-      setShopName('');
-      setLocation('');
-      setCategory('');
+    useEffect(() => {
       fetchMyShops();
-    }
-    setLoading(false);
-  };
+    }, []);
 
-  const handleDeleteShop = async (id) => {
-    await supabase.from('shops').delete().eq('id', id);
-    if (selectedShopId === id) setSelectedShopId(null);
-    fetchMyShops();
-  };
+    const fetchMyShops = async () => {
+      const { data } = await supabase
+        .from('shops')
+        .select('*')
+        .eq('owner_email', user.email);
+      if (data) setMyShops(data);
+    };
 
-  const openItemsFor = async (shopId) => {
-    setSelectedShopId(shopId);
-    setItemsLoading(true);
+    const handleAddShop = async () => {
+      if (!shopName || !location || !category) {
+        setMessage('Saari fields bharo!');
+        setIsError(true);
+        return;
+      }
+      setLoading(true);
+      const { error } = await supabase.from('shops').insert([{
+        name: shopName,
+        location: location,
+        category: category,
+        owner_email: user.email,
+      }]);
+      if (error) {
+        setMessage(error.message);
+        setIsError(true);
+      } else {
+        setMessage('Shop add ho gayi! 🎉');
+        setIsError(false);
+        setShopName('');
+        setLocation('');
+        setCategory('');
+        fetchMyShops();
+      }
+      setLoading(false);
+    };
 
-    const { data: itemsData } = await supabase
-      .from('Items')
-      .select('*')
-      .eq('status', 'approved');
+    const handleDeleteShop = async (id) => {
+      await supabase.from('shops').delete().eq('id', id);
+      if (selectedShopId === id) setSelectedShopId(null);
+      fetchMyShops();
+    };
 
-    const { data: shopItemsData } = await supabase
-      .from('shop_items')
-      .select('*')
-      .eq('shop_id', shopId);
+    const openItemsFor = async (shopId) => {
+      setSelectedShopId(shopId);
+      setItemsLoading(true);
+      setShowSuggestForm(false);
 
-    if (itemsData) setAllItems(itemsData);
+      const { data: itemsData } = await supabase
+        .from('Items')
+        .select('*')
+        .in('status', ['approved', 'pending']);
 
-    const priceMap = {};
-    if (shopItemsData) {
-      shopItemsData.forEach(si => {
-        priceMap[si.item_id] = si.price?.toString() ?? '';
-      });
-      setMyShopItems(shopItemsData);
-    }
-    setItemPrices(priceMap);
-    setItemsLoading(false);
-  };
+      const { data: shopItemsData } = await supabase
+        .from('shop_items')
+        .select('*')
+        .eq('shop_id', shopId);
 
-  const closeItemsPanel = () => {
-    setSelectedShopId(null);
-    setAllItems([]);
-    setMyShopItems([]);
-    setItemPrices({});
-  };
+      if (itemsData) setAllItems(itemsData);
 
-  const isItemAdded = (itemId) => myShopItems.some(si => si.item_id === itemId);
+      const priceMap = {};
+      if (shopItemsData) {
+        shopItemsData.forEach(si => {
+          priceMap[si.item_id] = si.price?.toString() ?? '';
+        });
+        setMyShopItems(shopItemsData);
+      }
+      setItemPrices(priceMap);
+      setItemsLoading(false);
+    };
 
-  const handlePriceChange = (itemId, value) => {
-    setItemPrices(prev => ({ ...prev, [itemId]: value }));
-  };
+    const closeItemsPanel = () => {
+      setSelectedShopId(null);
+      setAllItems([]);
+      setMyShopItems([]);
+      setItemPrices({});
+      setShowSuggestForm(false);
+    };
 
-  const handleAddItem = async (item) => {
-    const priceVal = itemPrices[item.id];
-    if (!priceVal || isNaN(priceVal) || Number(priceVal) <= 0) {
-      setMessage('Sahi price daalo ' + item.Name + ' ke liye');
-      setIsError(true);
-      return;
-    }
-    const { error } = await supabase.from('shop_items').insert([{
-      shop_id: selectedShopId,
-      item_id: item.id,
-      price: Number(priceVal),
-    }]);
-    if (error) {
-      setMessage(error.message);
-      setIsError(true);
-    } else {
-      setMessage(item.Name + ' add ho gaya! 🎉');
-      setIsError(false);
+    const isItemAdded = (itemId) => myShopItems.some(si => si.item_id === itemId);
+
+    const handlePriceChange = (itemId, value) => {
+      setItemPrices(prev => ({ ...prev, [itemId]: value }));
+    };
+
+    const handleAddItem = async (item) => {
+      const priceVal = itemPrices[item.id];
+      if (!priceVal || isNaN(priceVal) || Number(priceVal) <= 0) {
+        setMessage('Sahi price daalo ' + item.Name + ' ke liye');
+        setIsError(true);
+        return;
+      }
+      const { error } = await supabase.from('shop_items').insert([{
+        shop_id: selectedShopId,
+        item_id: item.id,
+        price: Number(priceVal),
+      }]);
+      if (error) {
+        setMessage(error.message);
+        setIsError(true);
+      } else {
+        setMessage(item.Name + ' add ho gaya! 🎉');
+        setIsError(false);
+        openItemsFor(selectedShopId);
+      }
+    };
+
+    const handleUpdateItemPrice = async (item) => {
+      const priceVal = itemPrices[item.id];
+      if (!priceVal || isNaN(priceVal) || Number(priceVal) <= 0) {
+        setMessage('Sahi price daalo ' + item.Name + ' ke liye');
+        setIsError(true);
+        return;
+      }
+      const existing = myShopItems.find(si => si.item_id === item.id);
+      if (!existing) return;
+      const { error } = await supabase
+        .from('shop_items')
+        .update({ price: Number(priceVal) })
+        .eq('id', existing.id);
+      if (error) {
+        setMessage(error.message);
+        setIsError(true);
+      } else {
+        setMessage('Price update ho gaya! ✅');
+        setIsError(false);
+        openItemsFor(selectedShopId);
+      }
+    };
+
+    const handleRemoveItem = async (item) => {
+      const existing = myShopItems.find(si => si.item_id === item.id);
+      if (!existing) return;
+      await supabase.from('shop_items').delete().eq('id', existing.id);
       openItemsFor(selectedShopId);
-    }
-  };
+    };
 
-  const handleUpdateItemPrice = async (item) => {
-    const priceVal = itemPrices[item.id];
-    if (!priceVal || isNaN(priceVal) || Number(priceVal) <= 0) {
-      setMessage('Sahi price daalo ' + item.Name + ' ke liye');
-      setIsError(true);
-      return;
-    }
-    const existing = myShopItems.find(si => si.item_id === item.id);
-    if (!existing) return;
-    const { error } = await supabase
-      .from('shop_items')
-      .update({ price: Number(priceVal) })
-      .eq('id', existing.id);
-    if (error) {
-      setMessage(error.message);
-      setIsError(true);
-    } else {
-      setMessage('Price update ho gaya! ✅');
-      setIsError(false);
-      openItemsFor(selectedShopId);
-    }
-  };
+    const handleSuggestItem = async () => {
+      if (!suggestName || !suggestCategory) {
+        setMessage('Item ka naam aur category dono bharo!');
+        setIsError(true);
+        return;
+      }
+      setSuggestLoading(true);
+      const { error } = await supabase.from('Items').insert([{
+        Name: suggestName,
+        category: suggestCategory,
+        status: 'pending',
+      }]);
+      if (error) {
+        setMessage(error.message);
+        setIsError(true);
+      } else {
+        setMessage(suggestName + ' suggest kar diya! Admin approval ka wait karo ⏳');
+        setIsError(false);
+        setSuggestName('');
+        setSuggestCategory('');
+        setShowSuggestForm(false);
+        openItemsFor(selectedShopId);
+      }
+      setSuggestLoading(false);
+    };
 
-  const handleRemoveItem = async (item) => {
-    const existing = myShopItems.find(si => si.item_id === item.id);
-    if (!existing) return;
-    await supabase.from('shop_items').delete().eq('id', existing.id);
-    openItemsFor(selectedShopId);
-  };
+    const groupedItems = allItems.reduce((acc, item) => {
+      const cat = item.category || 'Other';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+      return acc;
+    }, {});
 
-  const groupedItems = allItems.reduce((acc, item) => {
-    const cat = item.category || 'Other';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(item);
-    return acc;
-  }, {});
-  return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
-      {/* Navbar */}
-      <div style={{
-        background: C.surface,
-        borderBottom: `1px solid ${C.border}`,
-        padding: '14px 20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        position: 'sticky', top: 0, zIndex: 10,
-      }}>
-        <div style={{ fontFamily: fonts.display, fontSize: 20, fontWeight: 800, color: C.white }}>
-          🛍️ NearBuy
-        </div>
-        <button onClick={onLogout} style={{
-          background: 'transparent',
-          border: `1px solid ${C.border}`,
-          color: C.muted,
-          borderRadius: 8,
-          padding: '7px 14px',
-          cursor: 'pointer',
-          fontSize: 13,
-          fontFamily: fonts.body,
-        }}>Logout</button>
-      </div>
-
-      <div style={{ padding: '20px', maxWidth: 500, margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 800, color: C.white }}>
-            🏪 Apni Shop Add Karo
-          </h2>
-          <p style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{user?.email}</p>
-        </div>
-
-        {/* Message */}
-        {message && (
-          <div style={{
-            background: isError ? '#ff3b3b22' : '#22c55e22',
-            color: isError ? '#ff6b6b' : '#4ade80',
-            border: `1px solid ${isError ? '#ff3b3b44' : '#22c55e44'}`,
-            borderRadius: 8,
-            padding: '10px 14px',
-            fontSize: 13,
-            marginBottom: 16,
-          }}>{message}</div>
-        )}
-
-        {/* Form */}
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
         <div style={{
           background: C.surface,
-          border: `1px solid ${C.border}`,
-          borderRadius: 14,
-          padding: '20px',
-          marginBottom: 24,
+          borderBottom: `1px solid ${C.border}`,
+          padding: '14px 20px',
           display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          position: 'sticky', top: 0, zIndex: 10,
         }}>
-          <input className="nb-input" placeholder="Shop ka naam" value={shopName} onChange={e => setShopName(e.target.value)} />
-          <input className="nb-input" placeholder="Location (jaise Sector 18, Noida)" value={location} onChange={e => setLocation(e.target.value)} />
-          <input className="nb-input" placeholder="Category (jaise Grocery, Medical)" value={category} onChange={e => setCategory(e.target.value)} />
-          <button className="nb-btn" onClick={handleAddShop} disabled={loading}>
-            {loading ? 'Adding...' : '+ Shop Add Karo'}
-          </button>
+          <div style={{ fontFamily: fonts.display, fontSize: 20, fontWeight: 800, color: C.white }}>
+            🛍️ NearBuy
+          </div>
+          <button onClick={onLogout} style={{
+            background: 'transparent',
+            border: `1px solid ${C.border}`,
+            color: C.muted,
+            borderRadius: 8,
+            padding: '7px 14px',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontFamily: fonts.body,
+          }}>Logout</button>
         </div>
 
-        {/* My Shops */}
-        <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 700, color: C.white, marginBottom: 14 }}>
-          Meri Shops ({myShops.length})
-        </h3>
+        <div style={{ padding: '20px', maxWidth: 500, margin: '0 auto' }}>
+          <div style={{ marginBottom: 24 }}>
+            <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 800, color: C.white }}>
+              🏪 Apni Shop Add Karo
+            </h2>
+            <p style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{user?.email}</p>
+          </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
-          {myShops.length === 0 ? (
-            <div style={{ textAlign: 'center', color: C.muted, padding: '30px 0' }}>
-              Abhi koi shop nahi hai — upar se add karo! 🏪
-            </div>
-          ) : (
-            myShops.map(shop => (
-              <div key={shop.id} className="nb-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
-                    <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
-                    <span className="badge" style={{ marginTop: 6 }}>{shop.category}</span>
+          {message && (
+            <div style={{
+              background: isError ? '#ff3b3b22' : '#22c55e22',
+              color: isError ? '#ff6b6b' : '#4ade80',
+              border: `1px solid ${isError ? '#ff3b3b44' : '#22c55e44'}`,
+              borderRadius: 8,
+              padding: '10px 14px',
+              fontSize: 13,
+              marginBottom: 16,
+            }}>{message}</div>
+          )}
+
+          <div style={{
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 14,
+            padding: '20px',
+            marginBottom: 24,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}>
+            <input className="nb-input" placeholder="Shop ka naam" value={shopName} onChange={e => setShopName(e.target.value)} />
+            <input className="nb-input" placeholder="Location (jaise Sector 18, Noida)" value={location} onChange={e => setLocation(e.target.value)} />
+            <input className="nb-input" placeholder="Category (jaise Grocery, Medical)" value={category} onChange={e => setCategory(e.target.value)} />
+            <button className="nb-btn" onClick={handleAddShop} disabled={loading}>
+              {loading ? 'Adding...' : '+ Shop Add Karo'}
+            </button>
+          </div>
+
+          <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 700, color: C.white, marginBottom: 14 }}>
+            Meri Shops ({myShops.length})
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+            {myShops.length === 0 ? (
+              <div style={{ textAlign: 'center', color: C.muted, padding: '30px 0' }}>
+                Abhi koi shop nahi hai — upar se add karo! 🏪
+              </div>
+            ) : (
+              myShops.map(shop => (
+                <div key={shop.id} className="nb-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
+                      <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
+                      <span className="badge" style={{ marginTop: 6 }}>{shop.category}</span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteShop(shop.id)}
+                      style={{
+                        background: '#ff3b3b22',
+                        color: '#ff6b6b',
+                        border: '1px solid #ff3b3b44',
+                        borderRadius: 8,
+                        padding: '6px 12px',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontFamily: fonts.body,
+                      }}>
+                      🗑️ Delete
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleDeleteShop(shop.id)}
-                    style={{
-                      background: '#ff3b3b22',
-                      color: '#ff6b6b',
-                      border: '1px solid #ff3b3b44',
-                      borderRadius: 8,
-                      padding: '6px 12px',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      fontFamily: fonts.body,
-                    }}>
-                    🗑️ Delete
-                  </button>
-                </div>
-                <button
-                  className="nb-btn"
-                  onClick={() => selectedShopId === shop.id ? closeItemsPanel() : openItemsFor(shop.id)}
-                  style={{ marginTop: 14, background: selectedShopId === shop.id ? C.card : C.orange, border: selectedShopId === shop.id ? `1px solid ${C.border}` : 'none', color: selectedShopId === shop.id ? C.text : '#fff' }}
-                >
-                  {selectedShopId === shop.id ? '✕ Band Karo' : '📦 Items Manage Karo'}
-                </button>
 
-                {selectedShopId === shop.id && (
-                  <div style={{ marginTop: 18, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-                    {itemsLoading ? (
-                      <div style={{ textAlign: 'center', color: C.muted, padding: '20px 0' }}>Loading items...</div>
-                    ) : (
-                      <>
-                        <div style={{ marginBottom: 22 }}>
+                  <button
+                    className="nb-btn"
+                    onClick={() => selectedShopId === shop.id ? closeItemsPanel() : openItemsFor(shop.id)}
+                    style={{ marginTop: 14, background: selectedShopId === shop.id ? C.card : C.orange, border: selectedShopId === shop.id ? `1px solid ${C.border}` : 'none', color: selectedShopId === shop.id ? C.text : '#fff' }}
+                  >
+                    {selectedShopId === shop.id ? '✕ Band Karo' : '📦 Items Manage Karo'}
+                  </button>
+
+                  {selectedShopId === shop.id && (
+                    <div style={{ marginTop: 18, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+                      {itemsLoading ? (
+                        <div style={{ textAlign: 'center', color: C.muted, padding: '20px 0' }}>Loading items...</div>
+                      ) : (
+                        <div>
+                          <div style={{ marginBottom: 22 }}>
+                            <div style={{
+                              fontFamily: fonts.display,
+                              fontSize: 15,
+                              fontWeight: 700,
+                              color: C.white,
+                              marginBottom: 10,
+                            }}>
+                              🧾 Meri Items ({myShopItems.length})
+                            </div>
+                            {myShopItems.length === 0 ? (
+                              <div style={{ color: C.muted, fontSize: 13, padding: '10px 0' }}>
+                                Abhi koi item add nahi kiya — niche list se add karo 👇
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {myShopItems.map(si => {
+                                  const itemInfo = allItems.find(i => i.id === si.item_id);
+                                  if (!itemInfo) return null;
+                                  return (
+                                    <div key={si.id} style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 8,
+                                      background: C.orange + '11',
+                                      borderRadius: 10,
+                                      padding: '10px 12px',
+                                      border: `1px solid ${C.orange}44`,
+                                    }}>
+                                      <div style={{ flex: 1, fontSize: 14, color: C.white, fontWeight: 600 }}>
+                                        {itemInfo.Name}
+                                        <span className="badge" style={{ marginLeft: 8 }}>{itemInfo.category}</span>
+                                      </div>
+                                      <input
+                                        type="number"
+                                        value={itemPrices[si.item_id] ?? ''}
+                                        onChange={e => handlePriceChange(si.item_id, e.target.value)}
+                                        style={{
+                                          width: 80,
+                                          background: C.surface,
+                                          border: `1px solid ${C.border}`,
+                                          borderRadius: 8,
+                                          padding: '7px 10px',
+                                          color: C.text,
+                                          fontSize: 13,
+                                          outline: 'none',
+                                        }}
+                                      />
+                                      <button
+                                        onClick={() => handleUpdateItemPrice(itemInfo)}
+                                        style={{
+                                          background: C.orange, color: '#fff', border: 'none',
+                                          borderRadius: 8, padding: '7px 10px', fontSize: 12,
+                                          cursor: 'pointer', fontFamily: fonts.body,
+                                        }}
+                                      >
+                                        Update
+                                      </button>
+                                      <button
+                                        onClick={() => handleRemoveItem(itemInfo)}
+                                        style={{
+                                          background: '#ff3b3b22', color: '#ff6b6b',
+                                          border: '1px solid #ff3b3b44', borderRadius: 8,
+                                          padding: '7px 10px', fontSize: 12, cursor: 'pointer',
+                                          fontFamily: fonts.body,
+                                        }}
+                                      >
+                                        🗑️
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{
+                            marginBottom: 22,
+                            borderTop: `1px solid ${C.border}`,
+                            paddingTop: 16,
+                          }}>
+                            <button
+                              onClick={() => setShowSuggestForm(!showSuggestForm)}
+                              style={{
+                                background: 'transparent',
+                                border: `1px dashed ${C.orange}66`,
+                                color: C.orangeLight,
+                                borderRadius: 10,
+                                padding: '10px 14px',
+                                cursor: 'pointer',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                fontFamily: fonts.body,
+                                width: '100%',
+                              }}
+                            >
+                              {showSuggestForm ? '✕ Cancel' : '💡 List Mein Item Nahi Mila? Suggest Karo'}
+                            </button>
+
+                            {showSuggestForm && (
+                              <div style={{
+                                marginTop: 12,
+                                background: C.card,
+                                borderRadius: 10,
+                                padding: 14,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 10,
+                              }}>
+                                <input
+                                  className="nb-input"
+                                  placeholder="Item ka naam (jaise Maggi)"
+                                  value={suggestName}
+                                  onChange={e => setSuggestName(e.target.value)}
+                                />
+                                <input
+                                  className="nb-input"
+                                  placeholder="Category (jaise Grocery, Snacks)"
+                                  value={suggestCategory}
+                                  onChange={e => setSuggestCategory(e.target.value)}
+                                />
+                                <button
+                                  className="nb-btn"
+                                  onClick={handleSuggestItem}
+                                  disabled={suggestLoading}
+                                >
+                                  {suggestLoading ? 'Suggest ho raha hai...' : 'Suggest Karo'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
                           <div style={{
                             fontFamily: fonts.display,
                             fontSize: 15,
                             fontWeight: 700,
                             color: C.white,
                             marginBottom: 10,
+                            borderTop: `1px solid ${C.border}`,
+                            paddingTop: 16,
                           }}>
-                            🧾 Meri Items ({myShopItems.length})
+                            + Naya Item Add Karo
                           </div>
-                          {myShopItems.length === 0 ? (
-                            <div style={{ color: C.muted, fontSize: 13, padding: '10px 0' }}>
-                              Abhi koi item add nahi kiya — niche list se add karo 👇
+
+                          {Object.keys(groupedItems).length === 0 ? (
+                            <div style={{ textAlign: 'center', color: C.muted, padding: '20px 0' }}>
+                              Abhi koi items available nahi hain
                             </div>
                           ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {myShopItems.map(si => {
-                                const itemInfo = allItems.find(i => i.id === si.item_id);
-                                if (!itemInfo) return null;
-                                return (
-                                  <div key={si.id} style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    background: C.orange + '11',
-                                    borderRadius: 10,
-                                    padding: '10px 12px',
-                                    border: `1px solid ${C.orange}44`,
-                                  }}>
-                                    <div style={{ flex: 1, fontSize: 14, color: C.white, fontWeight: 600 }}>
-                                      {itemInfo.Name}
-                                      <span className="badge" style={{ marginLeft: 8 }}>{itemInfo.category}</span>
-                                    </div>
-                                    <input
-                                      type="number"
-                                      value={itemPrices[si.item_id] ?? ''}
-                                      onChange={e => handlePriceChange(si.item_id, e.target.value)}
-                                      style={{
-                                        width: 80,
-                                        background: C.surface,
+                            Object.keys(groupedItems).map(cat => (
+                              <div key={cat} style={{ marginBottom: 20 }}>
+                                <div style={{
+                                  fontFamily: fonts.display,
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                  color: C.orangeLight,
+                                  marginBottom: 10,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                }}>
+                                  {cat}
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  {groupedItems[cat].filter(item => !isItemAdded(item.id)).map(item => {
+                                    const isPending = item.status === 'pending';
+                                    return (
+                                      <div key={item.id} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        background: C.card,
+                                        borderRadius: 10,
+                                        padding: '10px 12px',
                                         border: `1px solid ${C.border}`,
-                                        borderRadius: 8,
-                                        padding: '7px 10px',
-                                        color: C.text,
-                                        fontSize: 13,
-                                        outline: 'none',
-                                      }}
-                                    />
-                                    <button
-                                      onClick={() => handleUpdateItemPrice(itemInfo)}
-                                      style={{
-                                        background: C.orange, color: '#fff', border: 'none',
-                                        borderRadius: 8, padding: '7px 10px', fontSize: 12,
-                                        cursor: 'pointer', fontFamily: fonts.body,
-                                      }}
-                                    >
-                                      Update
-                                    </button>
-                                    <button
-                                      onClick={() => handleRemoveItem(itemInfo)}
-                                      style={{
-                                        background: '#ff3b3b22', color: '#ff6b6b',
-                                        border: '1px solid #ff3b3b44', borderRadius: 8,
-                                        padding: '7px 10px', fontSize: 12, cursor: 'pointer',
-                                        fontFamily: fonts.body,
-                                      }}
-                                    >
-                                      🗑️
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                                        opacity: isPending ? 0.6 : 1,
+                                      }}>
+                                        <div style={{ flex: 1, fontSize: 14, color: C.text }}>
+                                          {item.Name}
+                                          {isPending && (
+                                            <span style={{ color: C.orangeLight, fontSize: 11, marginLeft: 6 }}>
+                                              ⏳ Pending Approval
+                                            </span>
+                                          )}
+                                        </div>
+                                        {!isPending && (
+                                          <React.Fragment>
+                                            <input
+                                              type="number"
+                                              placeholder="₹ Price"
+                                              value={itemPrices[item.id] ?? ''}
+                                              onChange={e => handlePriceChange(item.id, e.target.value)}
+                                              style={{
+                                                width: 80,
+                                                background: C.surface,
+                                                border: `1px solid ${C.border}`,
+                                                borderRadius: 8,
+                                                padding: '7px 10px',
+                                                color: C.text,
+                                                fontSize: 13,
+                                                outline: 'none',
+                                              }}
+                                            />
+                                            <button
+                                              onClick={() => handleAddItem(item)}
+                                              style={{
+                                                background: C.orange, color: '#fff', border: 'none',
+                                                borderRadius: 8, padding: '7px 12px', fontSize: 12,
+                                                cursor: 'pointer', fontFamily: fonts.body,
+                                              }}
+                                            >
+                                              + Add
+                                            </button>
+                                          </React.Fragment>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))
                           )}
                         </div>
-
-                        <div style={{
-                          fontFamily: fonts.display,
-                          fontSize: 15,
-                          fontWeight: 700,
-                          color: C.white,
-                          marginBottom: 10,
-                          borderTop: `1px solid ${C.border}`,
-                          paddingTop: 16,
-                        }}>
-                          + Naya Item Add Karo
-                        </div>
-                      </>
-                    )}
-                    {!itemsLoading && Object.keys(groupedItems).length === 0 ? (
-                      <div style={{ textAlign: 'center', color: C.muted, padding: '20px 0' }}>
-                        Abhi koi items available nahi hain
-                      </div>
-                    ) : (
-                      Object.keys(groupedItems).map(cat => (
-                        <div key={cat} style={{ marginBottom: 20 }}>
-                          <div style={{
-                            fontFamily: fonts.display,
-                            fontSize: 14,
-                            fontWeight: 700,
-                            color: C.orangeLight,
-                            marginBottom: 10,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                          }}>
-                            {cat}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {groupedItems[cat].filter(item => !isItemAdded(item.id)).map(item => {
-                              return (
-                                <div key={item.id} style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  background: C.card,
-                                  borderRadius: 10,
-                                  padding: '10px 12px',
-                                  border: `1px solid ${C.border}`,
-                                }}>
-                                  <div style={{ flex: 1, fontSize: 14, color: C.text }}>
-                                    {item.Name}
-                                  </div>
-                                  <input
-                                    type="number"
-                                    placeholder="₹ Price"
-                                    value={itemPrices[item.id] ?? ''}
-                                    onChange={e => handlePriceChange(item.id, e.target.value)}
-                                    style={{
-                                      width: 80,
-                                      background: C.surface,
-                                      border: `1px solid ${C.border}`,
-                                      borderRadius: 8,
-                                      padding: '7px 10px',
-                                      color: C.text,
-                                      fontSize: 13,
-                                      outline: 'none',
-                                    }}
-                                  />
-                                  <button
-                                    onClick={() => handleAddItem(item)}
-                                    style={{
-                                      background: C.orange, color: '#fff', border: 'none',
-                                      borderRadius: 8, padding: '7px 12px', fontSize: 12,
-                                      cursor: 'pointer', fontFamily: fonts.body,
-                                    }}
-                                  >
-                                    + Add
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ─── Main App ─────────────────────────────────────────────────────────────────
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null);
-  const [authRole, setAuthRole] = useState(null);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setRole(null);
-    setAuthRole(null);
-  };
-
-  if (!user) {
-    if (!authRole) return <RoleScreen onSelect={r => setAuthRole(r)} />;
-    return <AuthScreen role={authRole} onBack={() => setAuthRole(null)} />;
+    );
   }
+  // ─── Main App ─────────────────────────────────────────────────────────────────
+  export default function App() {
+    const [user, setUser] = useState(null);
+    const [role, setRole] = useState(null);
+    const [authRole, setAuthRole] = useState(null);
 
-  if (!role) return <RoleScreen onSelect={r => setRole(r)} />;
+    useEffect(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+      });
 
-  if (role === 'customer') return <CustomerDashboard user={user} onLogout={handleLogout} />;
-  if (role === 'shopkeeper') return <ShopOwnerDashboard user={user} onLogout={handleLogout} />;
-  if (role === 'admin') {
-    if (user.email !== 'rudrapratap.sani@gmail.com') {
-      return (
-        <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: fonts.body }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
-          <h2 style={{ color: C.white, fontFamily: fonts.display }}>Access Denied</h2>
-          <p style={{ color: C.muted, marginTop: 8 }}>Tumhare paas admin rights nahi hain.</p>
-          <button className="nb-btn" onClick={handleLogout} style={{ marginTop: 24, maxWidth: 200 }}>Logout</button>
-        </div>
-      );
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+      });
+
+      return () => subscription.unsubscribe();
+    }, []);
+
+    const handleLogout = async () => {
+      await supabase.auth.signOut();
+      setRole(null);
+      setAuthRole(null);
+    };
+
+    if (!user) {
+      if (!authRole) return <RoleScreen onSelect={r => setAuthRole(r)} />;
+      return <AuthScreen role={authRole} onBack={() => setAuthRole(null)} />;
     }
-    return <AdminDashboard user={user} onLogout={handleLogout} />;
+
+    if (!role) return <RoleScreen onSelect={r => setRole(r)} />;
+
+    if (role === 'customer') return <CustomerDashboard user={user} onLogout={handleLogout} />;
+    if (role === 'shopkeeper') return <ShopOwnerDashboard user={user} onLogout={handleLogout} />;
+    if (role === 'admin') {
+      if (user.email !== 'rudrapratap.sani@gmail.com') {
+        return (
+          <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontFamily: fonts.body }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+            <h2 style={{ color: C.white, fontFamily: fonts.display }}>Access Denied</h2>
+            <p style={{ color: C.muted, marginTop: 8 }}>Tumhare paas admin rights nahi hain.</p>
+            <button className="nb-btn" onClick={handleLogout} style={{ marginTop: 24, maxWidth: 200 }}>Logout</button>
+          </div>
+        );
+      }
+      return <AdminDashboard user={user} onLogout={handleLogout} />;
+    }
+    return null;
   }
-  return null;
 }
