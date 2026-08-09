@@ -305,9 +305,11 @@ function AuthScreen({ role, onBack }) {
 // ─── Customer Dashboard ───────────────────────────────────────────────────────
 function CustomerDashboard({ user, onLogout }) {
   const [search, setSearch] = useState('');
+  const [myArea, setMyArea] = useState('');
   const [shops, setShops] = useState([]);
   const [matchedItemsByShop, setMatchedItemsByShop] = useState({});
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     fetchShops();
   }, [search]);
@@ -373,9 +375,19 @@ function CustomerDashboard({ user, onLogout }) {
     setMatchedItemsByShop(itemShopMap);
     setLoading(false);
   };
+
+  const sortedShops = [...shops].sort((a, b) => {
+    if (!myArea) return 0;
+    const areaLower = myArea.toLowerCase();
+    const aMatch = a.location?.toLowerCase().includes(areaLower);
+    const bMatch = b.location?.toLowerCase().includes(areaLower);
+    if (aMatch && !bMatch) return -1;
+    if (!aMatch && bMatch) return 1;
+    return 0;
+  });
+
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
-      {/* Navbar */}
       <div style={{
         background: C.surface,
         borderBottom: `1px solid ${C.border}`,
@@ -406,7 +418,6 @@ function CustomerDashboard({ user, onLogout }) {
       </div>
 
       <div style={{ padding: '20px', maxWidth: 500, margin: '0 auto' }}>
-        {/* Greeting */}
         <div style={{ marginBottom: 20 }}>
           <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 800, color: C.white }}>
             Kya dhundh rahe ho? 🔍
@@ -414,7 +425,19 @@ function CustomerDashboard({ user, onLogout }) {
           <p style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{user?.email}</p>
         </div>
 
-        {/* Search */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ color: C.muted, fontSize: 12, marginBottom: 6, display: 'block' }}>
+            📍 Aapka Area
+          </label>
+          <input
+            className="nb-input"
+            type="text"
+            placeholder="Jaise Sector 18, Noida"
+            value={myArea}
+            onChange={e => setMyArea(e.target.value)}
+          />
+        </div>
+
         <div style={{ position: 'relative', marginBottom: 28 }}>
           <input
             className="nb-input"
@@ -430,16 +453,17 @@ function CustomerDashboard({ user, onLogout }) {
           }}>🔍</span>
         </div>
 
-        {/* Shop cards */}
         <div style={{ marginBottom: 12 }}>
           <span style={{ color: C.muted, fontSize: 13 }}>
-            {shops.length} shops mile • Sector 18 ke aas paas
+            {sortedShops.length} shops mile
+            {myArea ? ` • ${myArea} ke aas paas pehle` : ''}
           </span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {shops.map(shop => {
+          {sortedShops.map(shop => {
             const matchedItems = matchedItemsByShop[shop.id] || [];
+            const isNearby = myArea && shop.location?.toLowerCase().includes(myArea.toLowerCase());
             return (
               <div key={shop.id} className="nb-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -453,7 +477,14 @@ function CustomerDashboard({ user, onLogout }) {
                     {shop.emoji}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>
+                      {shop.name}
+                      {isNearby && (
+                        <span style={{ color: '#4ade80', fontSize: 11, marginLeft: 8 }}>
+                          📍 Aapke area mein
+                        </span>
+                      )}
+                    </div>
                     <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
                   </div>
                   <span className="badge">{shop.category}</span>
@@ -486,7 +517,7 @@ function CustomerDashboard({ user, onLogout }) {
             );
           })}
 
-          {shops.length === 0 && (
+          {sortedShops.length === 0 && (
             <div style={{ textAlign: 'center', color: C.muted, padding: '40px 0', fontSize: 15 }}>
               😔 Koi shop nahi mili<br />
               <span style={{ fontSize: 13 }}>Dusra naam try karo</span>
@@ -505,7 +536,7 @@ function CustomerDashboard({ user, onLogout }) {
           borderRadius: 10,
           border: `1px solid ${C.orange}33`,
         }}>
-          ⚡ GPS aur directions — Coming Soon!
+          ⚡ GPS aur exact directions — Coming Soon!
         </div>
       </div>
     </div>
