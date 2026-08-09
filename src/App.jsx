@@ -488,6 +488,28 @@ function CustomerDashboard({ user, onLogout }) {
                     <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
                   </div>
                   <span className="badge">{shop.category}</span>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    {shop.phone && (
+                      <>
+                        <a href={`tel:${shop.phone}`} onClick={e => e.stopPropagation()} style={{
+                          flex: 1, textAlign: 'center', textDecoration: 'none',
+                          background: C.card, color: C.text, border: `1px solid ${C.border}`,
+                          borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600,
+                          fontFamily: fonts.body,
+                        }}>
+                          📞 Call
+                        </a>
+                        <a href={`https://wa.me/91${shop.phone}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
+                          flex: 1, textAlign: 'center', textDecoration: 'none',
+                          background: '#22c55e22', color: '#4ade80', border: '1px solid #22c55e44',
+                          borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600,
+                          fontFamily: fonts.body,
+                        }}>
+                          💬 WhatsApp
+                        </a>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {matchedItems.length > 0 && (
@@ -777,6 +799,7 @@ function ShopOwnerDashboard({ user, onLogout }) {
   const [shopName, setShopName] = useState('');
   const [location, setLocation] = useState('');
   const [category, setCategory] = useState('');
+  const [phone, setPhone] = useState('');
   const [myShops, setMyShops] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -817,6 +840,7 @@ function ShopOwnerDashboard({ user, onLogout }) {
       location: location,
       category: category,
       owner_email: user.email,
+      phone: phone,
     }]);
     if (error) {
       setMessage(error.message);
@@ -827,6 +851,7 @@ function ShopOwnerDashboard({ user, onLogout }) {
       setShopName('');
       setLocation('');
       setCategory('');
+      setPhone('');
       fetchMyShops();
     }
     setLoading(false);
@@ -1024,6 +1049,7 @@ function ShopOwnerDashboard({ user, onLogout }) {
           <input className="nb-input" placeholder="Shop ka naam" value={shopName} onChange={e => setShopName(e.target.value)} />
           <input className="nb-input" placeholder="Location (jaise Sector 18, Noida)" value={location} onChange={e => setLocation(e.target.value)} />
           <input className="nb-input" placeholder="Category (jaise Grocery, Medical)" value={category} onChange={e => setCategory(e.target.value)} />
+          <input className="nb-input" placeholder="Phone number (jaise 9876543210)" value={phone} onChange={e => setphone(e.target.value)} />
           <button className="nb-btn" onClick={handleAddShop} disabled={loading}>
             {loading ? 'Adding...' : '+ Shop Add Karo'}
           </button>
