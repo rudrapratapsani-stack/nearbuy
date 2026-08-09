@@ -514,12 +514,14 @@ function CustomerDashboard({ user, onLogout }) {
 // ─── Admin Dashboard ────────────────────────────────────────────────────────
 function AdminDashboard({ user, onLogout }) {
   const [allShops, setAllShops] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
+  const [pendingItems, setPendingItems] = useState([]);
   const [tab, setTab] = useState('shops');
   const [loading, setLoading] = useState(true);
+  const [pendingLoading, setPendingLoading] = useState(true);
 
   useEffect(() => {
     fetchAllShops();
+    fetchPendingItems();
   }, []);
 
   const fetchAllShops = async () => {
@@ -529,14 +531,33 @@ function AdminDashboard({ user, onLogout }) {
     setLoading(false);
   };
 
+  const fetchPendingItems = async () => {
+    setPendingLoading(true);
+    const { data } = await supabase
+      .from('Items')
+      .select('*')
+      .eq('status', 'pending');
+    if (data) setPendingItems(data);
+    setPendingLoading(false);
+  };
+
   const handleDeleteShop = async (id) => {
     await supabase.from('shops').delete().eq('id', id);
     fetchAllShops();
   };
 
+  const handleApproveItem = async (id) => {
+    await supabase.from('Items').update({ status: 'approved' }).eq('id', id);
+    fetchPendingItems();
+  };
+
+  const handleRejectItem = async (id) => {
+    await supabase.from('Items').delete().eq('id', id);
+    fetchPendingItems();
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fonts.body }}>
-      {/* Navbar */}
       <div style={{
         background: C.surface,
         borderBottom: `1px solid ${C.border}`,
@@ -562,7 +583,6 @@ function AdminDashboard({ user, onLogout }) {
       </div>
 
       <div style={{ padding: '20px', maxWidth: 500, margin: '0 auto' }}>
-        {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <h2 style={{ fontFamily: fonts.display, fontSize: 22, fontWeight: 800, color: C.white }}>
             ⚙️ Admin Panel
@@ -570,7 +590,6 @@ function AdminDashboard({ user, onLogout }) {
           <p style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{user?.email}</p>
         </div>
 
-        {/* Stats */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
           <div style={{
             flex: 1, background: C.surface,
@@ -596,43 +615,127 @@ function AdminDashboard({ user, onLogout }) {
           </div>
         </div>
 
-        {/* All Shops */}
-        <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 700, color: C.white, marginBottom: 14 }}>
-          Saari Shops ({allShops.length})
-        </h3>
+        <div style={{
+          display: 'flex',
+          background: C.card,
+          borderRadius: 10,
+          padding: 4,
+          marginBottom: 20,
+          gap: 4,
+        }}>
+          {[
+            { key: 'shops', label: 'Shops' },
+            { key: 'pending', label: `Pending Items (${pendingItems.length})` },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                flex: 1,
+                padding: '9px',
+                borderRadius: 8,
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 600,
+                fontFamily: fonts.body,
+                background: tab === t.key ? C.orange : 'transparent',
+                color: tab === t.key ? C.white : C.muted,
+                transition: 'all 0.2s',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-        {loading ? (
-          <div style={{ textAlign: 'center', color: C.muted, padding: '30px 0' }}>Loading...</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {allShops.map(shop => (
-              <div key={shop.id} className="nb-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
-                    <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
-                    <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>👤 {shop.owner_email}</div>
-                    <span className="badge" style={{ marginTop: 6 }}>{shop.category}</span>
+        {tab === 'shops' && (
+          loading ? (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '30px 0' }}>Loading...</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {allShops.map(shop => (
+                <div key={shop.id} className="nb-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{shop.name}</div>
+                      <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>📍 {shop.location}</div>
+                      <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>👤 {shop.owner_email}</div>
+                      <span className="badge" style={{ marginTop: 6 }}>{shop.category}</span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteShop(shop.id)}
+                      style={{
+                        background: '#ff3b3b22',
+                        color: '#ff6b6b',
+                        border: '1px solid #ff3b3b44',
+                        borderRadius: 8,
+                        padding: '6px 12px',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontFamily: fonts.body,
+                        flexShrink: 0,
+                      }}>
+                      🗑️ Delete
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleDeleteShop(shop.id)}
-                    style={{
-                      background: '#ff3b3b22',
-                      color: '#ff6b6b',
-                      border: '1px solid #ff3b3b44',
-                      borderRadius: 8,
-                      padding: '6px 12px',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      fontFamily: fonts.body,
-                      flexShrink: 0,
-                    }}>
-                    🗑️ Delete
-                  </button>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {tab === 'pending' && (
+          pendingLoading ? (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '30px 0' }}>Loading...</div>
+          ) : pendingItems.length === 0 ? (
+            <div style={{ textAlign: 'center', color: C.muted, padding: '30px 0' }}>
+              Abhi koi pending item nahi hai 🎉
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {pendingItems.map(item => (
+                <div key={item.id} className="nb-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 15, color: C.white }}>{item.Name}</div>
+                      <span className="badge" style={{ marginTop: 6 }}>{item.category}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handleApproveItem(item.id)}
+                        style={{
+                          background: '#22c55e22',
+                          color: '#4ade80',
+                          border: '1px solid #22c55e44',
+                          borderRadius: 8,
+                          padding: '6px 12px',
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          fontFamily: fonts.body,
+                        }}>
+                        ✅ Approve
+                      </button>
+                      <button
+                        onClick={() => handleRejectItem(item.id)}
+                        style={{
+                          background: '#ff3b3b22',
+                          color: '#ff6b6b',
+                          border: '1px solid #ff3b3b44',
+                          borderRadius: 8,
+                          padding: '6px 12px',
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          fontFamily: fonts.body,
+                        }}>
+                        ❌ Reject
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>
